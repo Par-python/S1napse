@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QTimer
 from telemetry.listener import TelemetryListener
-from telemetry.simulator import Simulator
+from telemetry.simulator import TrackSimulator
 from telemetry.storage import SessionWriter
 import threading
 import queue
@@ -21,7 +21,9 @@ class MainWindow(QMainWindow):
         self.listener = TelemetryListener(port=9996, out_queue=self.queue)
         self.listener_thread = None
 
-        self.sim = Simulator(target_host="127.0.0.1", target_port=9996)
+        self.sim = TrackSimulator(target_host="127.0.0.1", target_port=9996, rate_hz=20)
+        self.sim.set_track("Monza")
+        self.sim.set_car("Porsche GT3 RS")
         self.sim_thread = None
 
         self.session_writer = None
@@ -102,13 +104,13 @@ class MainWindow(QMainWindow):
     def start_acc_sim(self):
         if self.sim_thread and self.sim_thread.is_alive():
             return
-        # start sim in its own thread, default mode 'ACC'
-        self.sim.set_mode("ACC")
+        # sim is already configured to Monza + Porsche GT3 RS
         self.sim_thread = threading.Thread(target=self.sim.run, daemon=True)
         self.sim_thread.start()
-        self.status_label.setText("Status: ACC simulator running -> sending UDP to 127.0.0.1:9996")
+        self.status_label.setText("Status: Monza simulator running -> sending UDP to 127.0.0.1:9996")
         self.start_acc_sim_btn.setEnabled(False)
         self.stop_acc_sim_btn.setEnabled(True)
+
 
     def stop_simulator(self):
         self.sim.stop()
