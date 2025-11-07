@@ -3,4 +3,5 @@ requests
 sqlmodel
 psycopg2-binary       
 python-dotenv          
-pyinstaller   
+pyinstaller
+matplotlib

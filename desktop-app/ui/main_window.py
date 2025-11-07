@@ -3,13 +3,14 @@ import os
 import time
 from PyQt6.QtWidgets import (
     QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel, QHBoxLayout, QComboBox,
-    QLineEdit, QMessageBox
+    QLineEdit, QMessageBox, QTabWidget
 )
 from PyQt6.QtCore import QTimer
 from telemetry.listener import TelemetryListener
 from telemetry.simulator import TrackSimulator
 from telemetry.storage import SessionWriter
 from telemetry.upload import upload_session
+from ui.visualization_widget import VisualizationWidget
 import threading
 import queue
 
@@ -17,7 +18,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Telemetry App (simulator + listener)")
-        self.resize(420, 200)
+        self.resize(1200, 800)
 
         self.queue = queue.Queue()
         self.listener = TelemetryListener(port=9996, out_queue=self.queue)
@@ -31,6 +32,13 @@ class MainWindow(QMainWindow):
         self.session_writer = None
         self.current_session_path = None
 
+        # Create tabs
+        self.tabs = QTabWidget()
+        
+        # Control tab
+        control_widget = QWidget()
+        control_layout = QVBoxLayout()
+        
         # UI widgets
         self.speed_label = QLabel("Speed: — km/h")
         self.rpm_label = QLabel("RPM: —")
@@ -68,36 +76,43 @@ class MainWindow(QMainWindow):
         self.upload_btn = QPushButton("Upload Last Session")
         self.upload_btn.clicked.connect(self.upload_last_session)
 
-        # layout
-        v = QVBoxLayout()
-        v.addWidget(self.speed_label)
-        v.addWidget(self.rpm_label)
-        v.addWidget(self.throttle_label)
-        v.addWidget(self.status_label)
+        # Control tab layout
+        control_layout.addWidget(self.speed_label)
+        control_layout.addWidget(self.rpm_label)
+        control_layout.addWidget(self.throttle_label)
+        control_layout.addWidget(self.status_label)
 
         h = QHBoxLayout()
         h.addWidget(self.start_listen_btn)
         h.addWidget(self.stop_listen_btn)
-        v.addLayout(h)
+        control_layout.addLayout(h)
 
         h2 = QHBoxLayout()
         h2.addWidget(self.start_acc_sim_btn)
         h2.addWidget(self.stop_acc_sim_btn)
-        v.addLayout(h2)
+        control_layout.addLayout(h2)
 
         h3 = QHBoxLayout()
         h3.addWidget(self.save_session_btn)
         h3.addWidget(self.stop_session_btn)
-        v.addLayout(h3)
+        control_layout.addLayout(h3)
         
-        v.addWidget(QLabel("Upload to Backend:"))
-        v.addWidget(self.driver_name_input)
-        v.addWidget(self.backend_url_input)
-        v.addWidget(self.upload_btn)
-
-        container = QWidget()
-        container.setLayout(v)
-        self.setCentralWidget(container)
+        control_layout.addWidget(QLabel("Upload to Backend:"))
+        control_layout.addWidget(self.driver_name_input)
+        control_layout.addWidget(self.backend_url_input)
+        control_layout.addWidget(self.upload_btn)
+        
+        control_layout.addStretch()
+        control_widget.setLayout(control_layout)
+        
+        # Visualization tab
+        self.visualization_widget = VisualizationWidget()
+        
+        # Add tabs
+        self.tabs.addTab(control_widget, "Control")
+        self.tabs.addTab(self.visualization_widget, "Visualizations")
+        
+        self.setCentralWidget(self.tabs)
 
         # Timer to poll queue and update UI
         self.timer = QTimer()
@@ -174,6 +189,9 @@ class MainWindow(QMainWindow):
             self.speed_label.setText(f"Speed: {speed} km/h")
             self.rpm_label.setText(f"RPM: {rpm}")
             self.throttle_label.setText(f"Throttle: {throttle} %")
+
+            # Update visualization widget
+            self.visualization_widget.update_telemetry(popped)
 
             # write to session if active
             if self.session_writer:

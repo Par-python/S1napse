@@ -6,7 +6,6 @@ import json
 import sys
 from pathlib import Path
 
-# --- Fix import path ---
 # Ensure desktop-app/ is in sys.path so we can import telemetry.*
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
@@ -68,7 +67,6 @@ def run(duration=10, host="127.0.0.1", port=9996, rate_hz=20):
         listener.stop()
         writer.close()
         print("Stopped. Session saved to:", fname)
-
 
 if __name__ == "__main__":
     dur = float(sys.argv[1]) if len(sys.argv) > 1 else 10.0
