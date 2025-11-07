@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel, QHBoxLayout, QComboBox,
     QLineEdit, QMessageBox, QTabWidget
 )
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, pyqtSignal, QObject
 from telemetry.listener import TelemetryListener
 from telemetry.simulator import TrackSimulator
 from telemetry.storage import SessionWriter
@@ -13,6 +13,13 @@ from telemetry.upload import upload_session
 from ui.visualization_widget import VisualizationWidget
 import threading
 import queue
+
+class UploadSignals(QObject):
+    """Signals for thread-safe UI updates from upload thread."""
+    success = pyqtSignal(dict)  # Emits result dict
+    failed = pyqtSignal()  # Emits when upload fails
+    error = pyqtSignal(str)  # Emits error message
+    finished = pyqtSignal()  # Emits when upload thread finishes
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -31,6 +38,13 @@ class MainWindow(QMainWindow):
 
         self.session_writer = None
         self.current_session_path = None
+        
+        # Upload signals for thread-safe UI updates
+        self.upload_signals = UploadSignals()
+        self.upload_signals.success.connect(self._show_upload_success)
+        self.upload_signals.failed.connect(self._show_upload_failed)
+        self.upload_signals.error.connect(self._show_upload_error)
+        self.upload_signals.finished.connect(self._reset_upload_button)
 
         # Create tabs
         self.tabs = QTabWidget()
@@ -43,6 +57,8 @@ class MainWindow(QMainWindow):
         self.speed_label = QLabel("Speed: — km/h")
         self.rpm_label = QLabel("RPM: —")
         self.throttle_label = QLabel("Throttle: — %")
+        self.abs_label = QLabel("ABS: —")
+        self.tcs_label = QLabel("TCS: —")
         self.status_label = QLabel("Status: stopped")
 
         # Buttons
@@ -80,6 +96,8 @@ class MainWindow(QMainWindow):
         control_layout.addWidget(self.speed_label)
         control_layout.addWidget(self.rpm_label)
         control_layout.addWidget(self.throttle_label)
+        control_layout.addWidget(self.abs_label)
+        control_layout.addWidget(self.tcs_label)
         control_layout.addWidget(self.status_label)
 
         h = QHBoxLayout()
@@ -186,9 +204,15 @@ class MainWindow(QMainWindow):
             speed = popped.get("speed", "—")
             rpm = popped.get("rpm", "—")
             throttle = popped.get("throttle", "—")
+            abs_status = popped.get("abs", False)
+            tcs_status = popped.get("tcs", False)
             self.speed_label.setText(f"Speed: {speed} km/h")
             self.rpm_label.setText(f"RPM: {rpm}")
             self.throttle_label.setText(f"Throttle: {throttle} %")
+            abs_text = "ON" if abs_status else "OFF"
+            self.abs_label.setText(f"ABS: {abs_text}")
+            tcs_text = "ON" if tcs_status else "OFF"
+            self.tcs_label.setText(f"TCS: {tcs_text}")
 
             # Update visualization widget
             self.visualization_widget.update_telemetry(popped)
@@ -196,6 +220,31 @@ class MainWindow(QMainWindow):
             # write to session if active
             if self.session_writer:
                 self.session_writer.write(popped)
+    
+    def _show_upload_success(self, result):
+        """Show success message box (called on main thread)."""
+        QMessageBox.information(
+            self,
+            "Upload Success",
+            f"Session uploaded successfully!\n\n"
+            f"ID: {result.get('id', 'N/A')}\n"
+            f"Driver: {result.get('driver_name', 'N/A')}\n"
+            f"Car: {result.get('car', 'N/A')}\n"
+            f"Track: {result.get('track', 'N/A')}"
+        )
+    
+    def _show_upload_failed(self):
+        """Show failed message box (called on main thread)."""
+        QMessageBox.warning(self, "Upload Failed", "Failed to upload session. Check backend connection.")
+    
+    def _show_upload_error(self, error_msg):
+        """Show error message box (called on main thread)."""
+        QMessageBox.critical(self, "Upload Error", f"Error during upload:\n{error_msg}")
+    
+    def _reset_upload_button(self):
+        """Reset upload button state (called on main thread)."""
+        self.upload_btn.setEnabled(True)
+        self.upload_btn.setText("Upload Last Session")
     
     def upload_last_session(self):
         """Upload the most recent session file to the backend."""
@@ -226,6 +275,7 @@ class MainWindow(QMainWindow):
         self.upload_btn.setText("Uploading...")
         
         def do_upload():
+            """Upload session in background thread - emits signals for UI updates."""
             try:
                 result = upload_session(
                     session_path=session_path,
@@ -233,22 +283,17 @@ class MainWindow(QMainWindow):
                     driver_name=driver_name
                 )
                 if result:
-                    QMessageBox.information(
-                        self,
-                        "Upload Success",
-                        f"Session uploaded successfully!\n\n"
-                        f"ID: {result.get('id', 'N/A')}\n"
-                        f"Driver: {result.get('driver_name', 'N/A')}\n"
-                        f"Car: {result.get('car', 'N/A')}\n"
-                        f"Track: {result.get('track', 'N/A')}"
-                    )
+                    # Emit signal to show success message on main thread
+                    self.upload_signals.success.emit(result)
                 else:
-                    QMessageBox.warning(self, "Upload Failed", "Failed to upload session. Check backend connection.")
+                    # Emit signal to show failure message on main thread
+                    self.upload_signals.failed.emit()
             except Exception as e:
-                QMessageBox.critical(self, "Upload Error", f"Error during upload:\n{str(e)}")
+                # Emit signal to show error message on main thread
+                self.upload_signals.error.emit(str(e))
             finally:
-                self.upload_btn.setEnabled(True)
-                self.upload_btn.setText("Upload Last Session")
+                # Emit signal to reset button on main thread
+                self.upload_signals.finished.emit()
         
         # Run upload in a separate thread to avoid blocking UI
         upload_thread = threading.Thread(target=do_upload, daemon=True)

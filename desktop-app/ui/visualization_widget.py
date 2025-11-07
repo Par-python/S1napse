@@ -26,7 +26,9 @@ class VisualizationWidget(QWidget):
             'brake': [],     # Brake in %
             'steering': [],  # Steering in degrees
             'gear': [],      # Gear number
-            'rpm': []        # RPM
+            'rpm': [],       # RPM
+            'abs': [],       # ABS active (0 or 1)
+            'tcs': []        # TCS active (0 or 1)
         }
         
         # Current values for display
@@ -36,6 +38,8 @@ class VisualizationWidget(QWidget):
         self.current_steering = 0.0
         self.current_gear = 0
         self.current_rpm = 0
+        self.current_abs = False
+        self.current_tcs = False
         self.current_lap_time = 0.0
         self.current_lap = 0
         self.best_lap_time = None
@@ -81,6 +85,14 @@ class VisualizationWidget(QWidget):
         lap_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         self.lap_value_label = lap_label
         
+        abs_label = QLabel("ABS: —")
+        abs_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #FF9800;")
+        self.abs_value_label = abs_label
+        
+        tcs_label = QLabel("TCS: —")
+        tcs_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2196F3;")
+        self.tcs_value_label = tcs_label
+        
         current_layout.addWidget(speed_label)
         current_layout.addWidget(throttle_label)
         current_layout.addWidget(brake_label)
@@ -88,6 +100,8 @@ class VisualizationWidget(QWidget):
         current_layout.addWidget(gear_label)
         current_layout.addWidget(rpm_label)
         current_layout.addWidget(lap_label)
+        current_layout.addWidget(abs_label)
+        current_layout.addWidget(tcs_label)
         current_layout.addStretch()
         
         layout.addLayout(current_layout)
@@ -148,6 +162,16 @@ class VisualizationWidget(QWidget):
         self.rpm_ax.grid(True, alpha=0.3)
         scroll_layout.addWidget(self.rpm_canvas)
         
+        # ABS/TCS chart
+        self.abs_tcs_fig = Figure(figsize=(10, 2))
+        self.abs_tcs_canvas = FigureCanvas(self.abs_tcs_fig)
+        self.abs_tcs_ax = self.abs_tcs_fig.add_subplot(111)
+        self.abs_tcs_ax.set_title("ABS/TCS Status")
+        self.abs_tcs_ax.set_xlabel("Distance/Time")
+        self.abs_tcs_ax.set_ylabel("Active (1) / Inactive (0)")
+        self.abs_tcs_ax.grid(True, alpha=0.3)
+        scroll_layout.addWidget(self.abs_tcs_canvas)
+        
         scroll_widget.setLayout(scroll_layout)
         scroll.setWidget(scroll_widget)
         layout.addWidget(scroll)
@@ -163,7 +187,9 @@ class VisualizationWidget(QWidget):
             'brake': [],
             'steering': [],
             'gear': [],
-            'rpm': []
+            'rpm': [],
+            'abs': [],
+            'tcs': []
         }
         self.lap_start_time = None
         
@@ -246,6 +272,20 @@ class VisualizationWidget(QWidget):
                 self.lap_data['rpm'].append(self.current_rpm)
             else:
                 self.lap_data['rpm'].append(0)
+            
+            # ABS
+            if "abs" in data and data["abs"] is not None:
+                self.current_abs = bool(data["abs"])
+                self.lap_data['abs'].append(1 if self.current_abs else 0)
+            else:
+                self.lap_data['abs'].append(0)
+            
+            # TCS
+            if "tcs" in data and data["tcs"] is not None:
+                self.current_tcs = bool(data["tcs"])
+                self.lap_data['tcs'].append(1 if self.current_tcs else 0)
+            else:
+                self.lap_data['tcs'].append(0)
         
         # Update UI
         self.update_labels()
@@ -260,12 +300,16 @@ class VisualizationWidget(QWidget):
         self.gear_value_label.setText(f"Gear: {self.current_gear}")
         self.rpm_value_label.setText(f"RPM: {self.current_rpm}")
         self.lap_value_label.setText(f"Lap: {self.current_lap}")
+        abs_status = "ON" if self.current_abs else "OFF"
+        self.abs_value_label.setText(f"ABS: {abs_status}")
+        tcs_status = "ON" if self.current_tcs else "OFF"
+        self.tcs_value_label.setText(f"TCS: {tcs_status}")
         
     def update_charts(self):
         """Update all charts with current lap data."""
         if len(self.lap_data['time']) == 0:
             # No data yet - show placeholder
-            for ax in [self.speed_ax, self.brake_gas_ax, self.steering_ax, self.gear_ax, self.rpm_ax]:
+            for ax in [self.speed_ax, self.brake_gas_ax, self.steering_ax, self.gear_ax, self.rpm_ax, self.abs_tcs_ax]:
                 ax.clear()
                 ax.text(0.5, 0.5, 'No lap data yet', 
                        horizontalalignment='center', verticalalignment='center',
@@ -276,6 +320,7 @@ class VisualizationWidget(QWidget):
             self.steering_canvas.draw()
             self.gear_canvas.draw()
             self.rpm_canvas.draw()
+            self.abs_tcs_canvas.draw()
             return
         
         time_data = self.lap_data['time']
@@ -366,3 +411,25 @@ class VisualizationWidget(QWidget):
                             horizontalalignment='right', verticalalignment='top',
                             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
         self.rpm_canvas.draw()
+        
+        # ABS/TCS chart
+        self.abs_tcs_ax.clear()
+        self.abs_tcs_ax.set_title("ABS/TCS Status")
+        self.abs_tcs_ax.set_xlabel("Distance/Time")
+        self.abs_tcs_ax.set_ylabel("Active (1) / Inactive (0)")
+        self.abs_tcs_ax.grid(True, alpha=0.3)
+        # Always set x-axis to track length (fixed, doesn't scroll)
+        self.abs_tcs_ax.set_xlim(0, self.track_length_m)
+        self.abs_tcs_ax.set_ylim(-0.1, 1.1)
+        if len(self.lap_data['abs']) > 0:
+            self.abs_tcs_ax.plot(time_data, self.lap_data['abs'], 'r-', linewidth=1.5, label='ABS', drawstyle='steps-post')
+            self.abs_tcs_ax.plot(time_data, self.lap_data['tcs'], 'b-', linewidth=1.5, label='TCS', drawstyle='steps-post')
+            self.abs_tcs_ax.legend(loc='upper right')
+            # Show current values
+            abs_status = "ON" if self.current_abs else "OFF"
+            tcs_status = "ON" if self.current_tcs else "OFF"
+            self.abs_tcs_ax.text(0.98, 0.98, f"ABS: {abs_status}\nTCS: {tcs_status}", 
+                                transform=self.abs_tcs_ax.transAxes,
+                                horizontalalignment='right', verticalalignment='top',
+                                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+        self.abs_tcs_canvas.draw()

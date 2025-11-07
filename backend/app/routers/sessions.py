@@ -151,6 +151,8 @@ async def upload_session(
                                 brake=data.get("brake", 0.0),
                                 gear=data.get("gear", 0),
                                 steer=data.get("steer", 0.0),
+                                abs=data.get("abs", False),
+                                tcs=data.get("tcs", False),
                                 in_pitlane=data.get("in_pitlane", False),
                                 is_curve=data.get("is_curve", False),
                                 ts=data.get("ts", 0.0)
@@ -284,6 +286,8 @@ async def get_session_telemetry(session_id: int, limit: int = 1000, offset: int 
                     "brake": s.brake,
                     "gear": s.gear,
                     "steer": s.steer,
+                    "abs": s.abs,
+                    "tcs": s.tcs,
                     "ts": s.ts,
                 }
                 for s in samples

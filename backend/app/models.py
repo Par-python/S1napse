@@ -41,6 +41,8 @@ class TelemetrySample(SQLModel, table=True):
     brake: float  # percentage
     gear: int
     steer: float  # steering input
+    abs: bool  # Anti-lock Braking System active
+    tcs: bool  # Traction Control System active
     
     # Track state
     in_pitlane: bool

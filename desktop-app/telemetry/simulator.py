@@ -185,12 +185,28 @@ class TrackSimulator:
 
             throttle_pct = 0.0
             brake_pct = 0.0
+            abs_active = False
+            tcs_active = False
+            
             if net_acc >= 0.1:
                 throttle_pct = clamp(100 * (net_acc / (self.car["accel_m_s2"] + 0.001)), 0, 100)
                 throttle_pct = round(throttle_pct * self.random.uniform(0.9, 1.05), 1)
+                # TCS activates when there's high throttle and potential wheel slip (e.g., in curves or low grip)
+                if throttle_pct > 70 and (is_curve or self.speed_ms < 10):
+                    # Simulate wheel slip detection - TCS kicks in
+                    if self.random.random() < 0.3:  # 30% chance when conditions are met
+                        tcs_active = True
+                        throttle_pct *= 0.7  # Reduce throttle when TCS is active
             elif net_acc < -0.5:
                 brake_pct = clamp(100 * (-net_acc / (self.car["brake_m_s2"] + 0.001)), 0, 100)
                 brake_pct = round(brake_pct * self.random.uniform(0.9, 1.05), 1)
+                # ABS activates when braking hard, especially in curves or on low grip surfaces
+                if brake_pct > 60:
+                    # Simulate wheel lock detection - ABS kicks in
+                    if self.random.random() < 0.4:  # 40% chance when braking hard
+                        abs_active = True
+                        # ABS modulates brake pressure
+                        brake_pct *= 0.85  # Slight reduction when ABS is active
 
             steer = self._steer_for_segment(seg_name, self.position_m)
             current_time = time.time()
@@ -225,6 +241,8 @@ class TrackSimulator:
                 "brake": brake_pct,
                 "gear": int(self.gear),
                 "steer": round(steer, 3),
+                "abs": abs_active,
+                "tcs": tcs_active,
                 "in_pitlane": self.in_pitlane,
                 "is_curve": is_curve,
                 "ts": current_time
