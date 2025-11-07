@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
+    # Default to SQLite for easy development, override with .env for PostgreSQL
     DATABASE_URL: str = "sqlite:///./telemetry.db"
     S3_BUCKET: str = "your-bucket"
     S3_REGION: str = "your-region"
