@@ -181,3 +181,4 @@ Once you've verified the visualizations work:
 3. Compare sector times to identify which sectors need improvement
 4. Use the speed graph to analyze speed patterns around the track
 
+

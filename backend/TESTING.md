@@ -204,11 +204,3 @@ curl -X POST "http://localhost:8000/sessions/upload" \
 - Check `DATABASE_URL` in `.env` or `config.py`
 - For PostgreSQL, ensure database exists: `createdb telemetry`
 
-## Next Steps
-
-Once testing is complete:
-1. Record longer sessions to see sector times improve
-2. Test pitlane entry (currently random, can be triggered manually)
-3. Upload multiple sessions and view them via the backend API
-4. Integrate with frontend to visualize the data
-
