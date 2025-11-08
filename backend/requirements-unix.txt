@@ -1,0 +1,4 @@
+# Unix/Linux specific requirements (includes uvloop for better performance)
+-r requirements.txt
+uvloop==0.22.1
+
