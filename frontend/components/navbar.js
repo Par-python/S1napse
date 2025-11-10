@@ -4,7 +4,7 @@ export default function NavBar() {
   return (
     <nav className="relative flex items-center justify-between px-8 py-4">
       {/* Left: Logo */}
-      <div className="text-2xl font-bold text-white">
+      <div className="text-4xl font-bold text-white">
         S<span className="text-purple-500">1</span>
       </div>
 
@@ -19,7 +19,7 @@ export default function NavBar() {
       </div>
 
       {/* Right: Login button */}
-      <button className="bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium px-6 py-2 rounded-full flex items-center gap-2 transition-colors">
+      <button className="bg-linear-to-r from-[#963CCD] to-[#891BCD] hover:opacity-90 text-white border-2 border-[#763F98] text-sm font-medium px-6 py-2 rounded-full flex items-center gap-2 transition duration-200">
         Login
         <span className="text-lg">→</span>
       </button>
